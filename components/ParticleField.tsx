@@ -485,32 +485,33 @@ export function ParticleField() {
     }
   });
 
+  // Build geometries imperatively (avoids R3F v9 bufferAttribute type issues)
+  const particleGeometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+    geo.setAttribute("aOpacity", new THREE.BufferAttribute(opacities, 1));
+    geo.setAttribute("aPhase", new THREE.BufferAttribute(phases, 1));
+    return geo;
+  }, [positions, colors, sizes, opacities, phases]);
+
+  const lineGeometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(lineData.linePositions, 3),
+    );
+    geo.setAttribute(
+      "aLineAlpha",
+      new THREE.BufferAttribute(lineData.lineAlphas, 1),
+    );
+    return geo;
+  }, [lineData]);
+
   return (
     <group ref={groupRef}>
-      {/* Particle points */}
-      <points ref={pointsRef}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[positions, 3]}
-          />
-          <bufferAttribute
-            attach="attributes-color"
-            args={[colors, 3]}
-          />
-          <bufferAttribute
-            attach="attributes-aSize"
-            args={[sizes, 1]}
-          />
-          <bufferAttribute
-            attach="attributes-aOpacity"
-            args={[opacities, 1]}
-          />
-          <bufferAttribute
-            attach="attributes-aPhase"
-            args={[phases, 1]}
-          />
-        </bufferGeometry>
+      <points ref={pointsRef} geometry={particleGeometry}>
         <shaderMaterial
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
@@ -522,18 +523,7 @@ export function ParticleField() {
         />
       </points>
 
-      {/* Constellation connecting lines */}
-      <lineSegments ref={linesRef}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[lineData.linePositions, 3]}
-          />
-          <bufferAttribute
-            attach="attributes-aLineAlpha"
-            args={[lineData.lineAlphas, 1]}
-          />
-        </bufferGeometry>
+      <lineSegments ref={linesRef} geometry={lineGeometry}>
         <shaderMaterial
           vertexShader={lineVertexShader}
           fragmentShader={lineFragmentShader}
