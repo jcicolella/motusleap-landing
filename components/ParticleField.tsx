@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useCallback } from "react";
+import { useRef, useMemo, useCallback, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -219,12 +219,14 @@ export function ParticleField() {
   }, []);
 
   // Attach/detach pointer listeners
-  const listenerAttached = useRef(false);
-  if (typeof window !== "undefined" && !listenerAttached.current) {
+  useEffect(() => {
     window.addEventListener("pointermove", onPointerMove as EventListener);
     window.addEventListener("pointerleave", onPointerLeave);
-    listenerAttached.current = true;
-  }
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove as EventListener);
+      window.removeEventListener("pointerleave", onPointerLeave);
+    };
+  }, [onPointerMove, onPointerLeave]);
 
   // -------------------------------------------------------------------------
   // Initialize particle data
