@@ -9,6 +9,9 @@ const syne = Syne({
 
 export const metadata: Metadata = {
   title: "Motus Leap",
+  icons: {
+    icon: "/favicon.svg",
+  },
   openGraph: {
     title: "Motus Leap",
   },
