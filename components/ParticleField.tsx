@@ -22,7 +22,6 @@ const MAJOR_DURATION = 2.5;
 const MINOR_DURATION = 1.5;
 const MAJOR_MULTIPLIER = 3.0;
 const MINOR_MULTIPLIER = 1.8;
-const GLOBAL_ROTATION_SPEED = 0.006;
 
 // Brand palette
 const PALETTE = [
@@ -297,8 +296,8 @@ export function ParticleField() {
 
     // Subtle global rotation
     if (groupRef.current) {
-      groupRef.current.rotation.y += GLOBAL_ROTATION_SPEED * dt;
-      groupRef.current.rotation.x = Math.sin(t * 0.1) * 0.015;
+      groupRef.current.rotation.y = Math.sin(t * 0.03) * 0.08;
+      groupRef.current.rotation.x = Math.sin(t * 0.02) * 0.015;
     }
   });
 

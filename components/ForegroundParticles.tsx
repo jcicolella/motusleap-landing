@@ -145,7 +145,7 @@ export function ForegroundParticles() {
     posAttr.needsUpdate = true;
 
     if (groupRef.current) {
-      groupRef.current.rotation.y += 0.004 * dt;
+      groupRef.current.rotation.y = Math.sin(uniforms.uTime.value * 0.025) * 0.06;
     }
   });
 
