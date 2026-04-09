@@ -1,12 +1,14 @@
 "use client";
 
 import { useRef, useMemo } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
-const COUNT = 80;
-const SPREAD = 6;
-const DRIFT = 0.003;
+const COUNT = 60;
+const CAM_Z = 5;
+const CAM_FOV = 75;
+const HALF_H = CAM_Z * Math.tan((CAM_FOV / 2) * (Math.PI / 180));
+const BASE_RISE_SPEED = 0.25; // slower than background — feels "closer"
 
 const PALETTE = [
   new THREE.Color("#00d4ff"),
@@ -46,53 +48,50 @@ const fragmentShader = /* glsl */ `
 `;
 
 export function ForegroundParticles() {
+  const { size } = useThree();
   const pointsRef = useRef<THREE.Points>(null);
   const groupRef = useRef<THREE.Group>(null);
 
-  const { positions, velocities, colors, sizes, opacities, phases } =
+  const halfW = useMemo(
+    () => HALF_H * (size.width / size.height),
+    [size.width, size.height],
+  );
+
+  const { positions, riseSpeeds, colors, sizes, opacities, phases } =
     useMemo(() => {
       const pos = new Float32Array(COUNT * 3);
-      const vel = new Float32Array(COUNT * 3);
+      const rise = new Float32Array(COUNT);
       const col = new Float32Array(COUNT * 3);
       const sz = new Float32Array(COUNT);
       const op = new Float32Array(COUNT);
       const ph = new Float32Array(COUNT);
 
       for (let i = 0; i < COUNT; i++) {
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
-        const r = SPREAD * Math.pow(Math.random(), 0.4);
-        pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-        pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-        pos[i * 3 + 2] = r * Math.cos(phi);
+        pos[i * 3] = (Math.random() - 0.5) * halfW * 2;
+        pos[i * 3 + 1] = (Math.random() - 0.5) * HALF_H * 2;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 2;
 
-        vel[i * 3] = (Math.random() - 0.5) * DRIFT;
-        vel[i * 3 + 1] = (Math.random() - 0.5) * DRIFT;
-        vel[i * 3 + 2] = (Math.random() - 0.5) * DRIFT * 0.3;
+        rise[i] = BASE_RISE_SPEED * (0.5 + Math.random() * 1.0);
 
         const c = PALETTE[Math.floor(Math.random() * PALETTE.length)];
         col[i * 3] = c.r;
         col[i * 3 + 1] = c.g;
         col[i * 3 + 2] = c.b;
 
-        // Larger than background particles — "closer to camera"
         sz[i] = 1.5 + Math.random() * 3.0;
-
-        // Much dimmer — don't obscure the text
-        op[i] = 0.06 + Math.random() * 0.12;
-
+        op[i] = 0.04 + Math.random() * 0.1;
         ph[i] = Math.random();
       }
 
       return {
         positions: pos,
-        velocities: vel,
+        riseSpeeds: rise,
         colors: col,
         sizes: sz,
         opacities: op,
         phases: ph,
       };
-    }, []);
+    }, [halfW]);
 
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
 
@@ -110,35 +109,38 @@ export function ForegroundParticles() {
     if (!pointsRef.current) return;
     const dt = Math.min(delta, 0.05);
     uniforms.uTime.value += dt;
+    const t = uniforms.uTime.value;
 
     const posAttr = pointsRef.current.geometry.getAttribute(
       "position",
     ) as THREE.BufferAttribute;
     const posArr = posAttr.array as Float32Array;
 
+    const topEdge = HALF_H + 0.5;
+    const bottomEdge = -HALF_H - 0.5;
+
     for (let i = 0; i < COUNT; i++) {
       const ix = i * 3;
-      // Gentle sine-driven drift — no noise needed for a small count
       const phase = phases[i] * Math.PI * 2;
-      const t = uniforms.uTime.value;
-      posArr[ix] += (velocities[ix] + Math.sin(t * 0.2 + phase) * 0.001) * dt * 60;
-      posArr[ix + 1] += (velocities[ix + 1] + Math.cos(t * 0.15 + phase) * 0.001) * dt * 60;
-      posArr[ix + 2] += velocities[ix + 2] * dt * 60;
 
-      // Soft wrap
-      const dist = Math.sqrt(posArr[ix] ** 2 + posArr[ix + 1] ** 2 + posArr[ix + 2] ** 2);
-      if (dist > SPREAD + 1) {
-        const pull = 0.02 * (dist - SPREAD);
-        posArr[ix] -= (posArr[ix] / dist) * pull;
-        posArr[ix + 1] -= (posArr[ix + 1] / dist) * pull;
-        posArr[ix + 2] -= (posArr[ix + 2] / dist) * pull;
+      // Upward drift
+      posArr[ix + 1] += riseSpeeds[i] * dt;
+
+      // Gentle wobble
+      posArr[ix] += Math.sin(t * 0.3 + phase) * 0.15 * dt;
+
+      // Recycle at top
+      if (posArr[ix + 1] > topEdge) {
+        posArr[ix] = (Math.random() - 0.5) * halfW * 2;
+        posArr[ix + 1] = bottomEdge;
+        posArr[ix + 2] = (Math.random() - 0.5) * 2;
       }
     }
 
     posAttr.needsUpdate = true;
 
     if (groupRef.current) {
-      groupRef.current.rotation.y += 0.005 * dt;
+      groupRef.current.rotation.y += 0.004 * dt;
     }
   });
 
