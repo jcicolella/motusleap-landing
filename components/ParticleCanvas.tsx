@@ -5,7 +5,7 @@ import { ParticleField } from "./ParticleField";
 
 export function ParticleCanvas() {
   return (
-    <div className="fixed inset-0 -z-10">
+    <div className="fixed inset-0 z-0">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 75 }}
         gl={{ alpha: true, antialias: true }}
