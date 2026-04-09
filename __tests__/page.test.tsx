@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import Home from "@/app/page";
 
-// Mock R3F Canvas — it requires WebGL which jsdom doesn't have
 vi.mock("@react-three/fiber", () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="r3f-canvas">{children}</div>
@@ -20,5 +19,16 @@ describe("Home page", () => {
   it("renders the brand name", () => {
     render(<Home />);
     expect(screen.getByText("MOTUS LEAP")).toBeDefined();
+  });
+
+  it("renders the Three.js canvas", () => {
+    render(<Home />);
+    expect(screen.getByTestId("r3f-canvas")).toBeDefined();
+  });
+
+  it("renders the brand name as an h1", () => {
+    render(<Home />);
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toBe("MOTUS LEAP");
   });
 });
