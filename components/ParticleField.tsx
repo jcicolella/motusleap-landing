@@ -8,16 +8,16 @@ import * as THREE from "three";
 // Constants
 // ---------------------------------------------------------------------------
 
-const SPREAD = 6; // radius of initial sphere
-const MOUSE_ATTRACT_RADIUS = 3.0;
-const MOUSE_REPEL_RADIUS = 0.8;
-const ATTRACT_STRENGTH = 0.012;
-const REPEL_STRENGTH = 0.04;
-const DRIFT_SPEED = 0.15;
-const WRAP_BOUND = 8;
-const LINE_DISTANCE = 0.55; // distance threshold for constellation lines
+const SPREAD = 5; // radius of initial sphere
+const MOUSE_ATTRACT_RADIUS = 2.5;
+const MOUSE_REPEL_RADIUS = 0.6;
+const ATTRACT_STRENGTH = 0.004;
+const REPEL_STRENGTH = 0.012;
+const DRIFT_SPEED = 0.03; // gentle — noise drives flow, not acceleration
+const WRAP_BOUND = 6;
+const LINE_DISTANCE = 0.7; // distance threshold for constellation lines
 const MAX_LINES = 3000; // cap on visible line segments for perf
-const GLOBAL_ROTATION_SPEED = 0.015; // rad/s for slow cloud rotation
+const GLOBAL_ROTATION_SPEED = 0.008; // rad/s — very slow cloud rotation
 
 // Brand palette (linear-space values will be computed from these)
 const PALETTE = [
@@ -132,7 +132,7 @@ const vertexShader = /* glsl */ `
     vColor = color;
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * (300.0 / -mvPosition.z);
+    gl_PointSize = aSize * (80.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
@@ -283,11 +283,11 @@ export function ParticleField() {
         col[i * 3 + 1] = c.g;
         col[i * 3 + 2] = c.b;
 
-        // Varied sizes for depth
-        sz[i] = 2.0 + Math.random() * 5.0;
+        // Varied sizes for depth — small and subtle
+        sz[i] = 1.0 + Math.random() * 2.5;
 
-        // Opacity — most particles moderately bright, some dimmer
-        op[i] = 0.3 + Math.random() * 0.7;
+        // Opacity — soft glow, not blinding
+        op[i] = 0.2 + Math.random() * 0.5;
 
         // Phase offset for per-particle animations
         ph[i] = Math.random();
@@ -381,9 +381,9 @@ export function ParticleField() {
 
       // Per-particle sine drift (unique phase, different frequencies per axis)
       const phase = phases[i] * Math.PI * 2;
-      velocities[ix] += Math.sin(t * 0.5 + phase) * 0.002 * dt;
-      velocities[iy] += Math.cos(t * 0.4 + phase * 1.3) * 0.002 * dt;
-      velocities[iz] += Math.sin(t * 0.3 + phase * 0.7) * 0.001 * dt;
+      velocities[ix] += Math.sin(t * 0.3 + phase) * 0.0005 * dt;
+      velocities[iy] += Math.cos(t * 0.25 + phase * 1.3) * 0.0005 * dt;
+      velocities[iz] += Math.sin(t * 0.2 + phase * 0.7) * 0.0003 * dt;
 
       // Mouse interaction
       if (mouseActive.current) {
@@ -406,8 +406,8 @@ export function ParticleField() {
         }
       }
 
-      // Damping — critical for not flying off
-      const damping = 0.96;
+      // Damping — strong enough to keep things calm
+      const damping = 0.92;
       velocities[ix] *= damping;
       velocities[iy] *= damping;
       velocities[iz] *= damping;
@@ -417,10 +417,10 @@ export function ParticleField() {
       py += velocities[iy] * dt * 60;
       pz += velocities[iz] * dt * 60;
 
-      // Soft wrapping — fade back toward center when too far out
+      // Soft wrapping — pull back toward center when too far out
       const distFromCenter = Math.sqrt(px * px + py * py + pz * pz);
       if (distFromCenter > WRAP_BOUND) {
-        const pullback = 0.01 * (distFromCenter - WRAP_BOUND);
+        const pullback = 0.03 * (distFromCenter - WRAP_BOUND);
         px -= (px / distFromCenter) * pullback;
         py -= (py / distFromCenter) * pullback;
         pz -= (pz / distFromCenter) * pullback;
