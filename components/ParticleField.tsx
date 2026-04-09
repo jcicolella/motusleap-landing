@@ -8,7 +8,6 @@ import * as THREE from "three";
 // Constants
 // ---------------------------------------------------------------------------
 
-const PARTICLE_COUNT = 1500;
 const SPREAD = 6; // radius of initial sphere
 const MOUSE_ATTRACT_RADIUS = 3.0;
 const MOUSE_REPEL_RADIUS = 0.8;
@@ -220,13 +219,36 @@ export function ParticleField() {
 
   // Attach/detach pointer listeners
   useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        const nx = (e.touches[0].clientX / size.width) * 2 - 1;
+        const ny = -(e.touches[0].clientY / size.height) * 2 + 1;
+        const halfH = 5 * Math.tan((75 / 2) * (Math.PI / 180));
+        const halfW = halfH * (size.width / size.height);
+        mouseWorld.current.set(nx * halfW, ny * halfH, 0);
+        mouseActive.current = true;
+      }
+    };
     window.addEventListener("pointermove", onPointerMove as EventListener);
     window.addEventListener("pointerleave", onPointerLeave);
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
     return () => {
       window.removeEventListener("pointermove", onPointerMove as EventListener);
       window.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("touchmove", handleTouchMove);
     };
-  }, [onPointerMove, onPointerLeave]);
+  }, [onPointerMove, onPointerLeave, size]);
+
+  // -------------------------------------------------------------------------
+  // Responsive particle count
+  // -------------------------------------------------------------------------
+
+  const particleCount = useMemo(() => {
+    const area = size.width * size.height;
+    if (area < 500000) return 800;   // mobile
+    if (area < 1500000) return 1200; // tablet
+    return 1500;                     // desktop
+  }, [size.width, size.height]);
 
   // -------------------------------------------------------------------------
   // Initialize particle data
@@ -234,14 +256,14 @@ export function ParticleField() {
 
   const { positions, velocities, colors, sizes, opacities, phases } =
     useMemo(() => {
-      const pos = new Float32Array(PARTICLE_COUNT * 3);
-      const vel = new Float32Array(PARTICLE_COUNT * 3);
-      const col = new Float32Array(PARTICLE_COUNT * 3);
-      const sz = new Float32Array(PARTICLE_COUNT);
-      const op = new Float32Array(PARTICLE_COUNT);
-      const ph = new Float32Array(PARTICLE_COUNT);
+      const pos = new Float32Array(particleCount * 3);
+      const vel = new Float32Array(particleCount * 3);
+      const col = new Float32Array(particleCount * 3);
+      const sz = new Float32Array(particleCount);
+      const op = new Float32Array(particleCount);
+      const ph = new Float32Array(particleCount);
 
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
+      for (let i = 0; i < particleCount; i++) {
         // Distribute in a sphere with slight clustering toward center
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
@@ -279,7 +301,7 @@ export function ParticleField() {
         opacities: op,
         phases: ph,
       };
-    }, []);
+    }, [particleCount]);
 
   // -------------------------------------------------------------------------
   // Initialize line geometry (pre-allocated buffer, updated each frame)
@@ -325,7 +347,7 @@ export function ParticleField() {
     const t = uniforms.uTime.value;
 
     // --- Update particles ---
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
+    for (let i = 0; i < particleCount; i++) {
       const ix = i * 3;
       const iy = ix + 1;
       const iz = ix + 2;
@@ -421,11 +443,11 @@ export function ParticleField() {
       // Spatial check — only compare nearby particles via a simple grid
       // For perf, we check a random subset each frame rather than all N^2 pairs
       const SAMPLE_SIZE = 600; // particles to check each frame
-      const step = Math.max(1, Math.floor(PARTICLE_COUNT / SAMPLE_SIZE));
+      const step = Math.max(1, Math.floor(particleCount / SAMPLE_SIZE));
 
       for (
         let i = 0;
-        i < PARTICLE_COUNT && lineCount < MAX_LINES;
+        i < particleCount && lineCount < MAX_LINES;
         i += step
       ) {
         const ax = posArr[i * 3];
@@ -434,7 +456,7 @@ export function ParticleField() {
 
         for (
           let j = i + 1;
-          j < Math.min(i + 30, PARTICLE_COUNT) && lineCount < MAX_LINES;
+          j < Math.min(i + 30, particleCount) && lineCount < MAX_LINES;
           j++
         ) {
           const bx = posArr[j * 3];
