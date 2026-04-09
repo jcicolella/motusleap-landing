@@ -30,16 +30,16 @@ export function BrandOverlay() {
       const s = smoothRef.current;
       const m = mouseRef.current;
 
-      // Parallax: mouse at center = no offset, edges = ±3px (inverted for depth)
-      const targetX = (m.x - 0.5) * -6;
-      const targetY = (m.y - 0.5) * -6;
+      // Parallax: mouse at center = no offset, edges = ±12px (inverted for depth)
+      const targetX = (m.x - 0.5) * -24;
+      const targetY = (m.y - 0.5) * -16;
 
       // Shadow offset: glow shifts TOWARD the mouse
-      const targetShadowX = (m.x - 0.5) * 20;
-      const targetShadowY = (m.y - 0.5) * 12;
+      const targetShadowX = (m.x - 0.5) * 40;
+      const targetShadowY = (m.y - 0.5) * 24;
 
       // Smooth lerp
-      const lerp = 0.05;
+      const lerp = 0.04;
       s.x += (targetX - s.x) * lerp;
       s.y += (targetY - s.y) * lerp;
       s.shadowX += (targetShadowX - s.shadowX) * lerp;
@@ -52,8 +52,9 @@ export function BrandOverlay() {
 
         // Directional teal glow that follows the cursor
         h1Ref.current.style.textShadow = [
-          `${s.shadowX}px ${s.shadowY}px 50px rgba(0, 212, 255, 0.2)`,
-          `0 0 30px rgba(0, 212, 255, 0.08)`,
+          `${s.shadowX}px ${s.shadowY}px 60px rgba(0, 212, 255, 0.35)`,
+          `${s.shadowX * 0.5}px ${s.shadowY * 0.5}px 20px rgba(0, 212, 255, 0.15)`,
+          `0 0 40px rgba(0, 212, 255, 0.1)`,
         ].join(", ");
       }
 

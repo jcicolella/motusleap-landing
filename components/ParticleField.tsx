@@ -9,11 +9,11 @@ import * as THREE from "three";
 // ---------------------------------------------------------------------------
 
 const SPREAD = 5; // radius of initial sphere
-const MOUSE_RADIUS = 2.0; // zone of influence
-const MOUSE_STRENGTH = 0.002; // very gentle push away — no attraction
+const MOUSE_RADIUS = 1.5; // zone of influence
+const MOUSE_STRENGTH = 0.0008; // barely perceptible push
 const DRIFT_SPEED = 0.03; // gentle — noise drives flow, not acceleration
 const WRAP_BOUND = 6;
-const MAX_VELOCITY = 0.015; // velocity cap prevents streaking
+const MAX_VELOCITY = 0.008; // velocity cap prevents streaking
 const GLOBAL_ROTATION_SPEED = 0.008; // rad/s — very slow cloud rotation
 
 // Brand palette (linear-space values will be computed from these)
