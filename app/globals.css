@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ml-void: #0a0e1a;
+  --color-ml-teal: #00d4ff;
+  --color-ml-amber: #ff8a00;
+  --color-ml-white: #e0e6f0;
+  --color-ml-text: #f0f2f5;
+}
