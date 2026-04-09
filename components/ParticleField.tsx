@@ -15,8 +15,6 @@ const ATTRACT_STRENGTH = 0.004;
 const REPEL_STRENGTH = 0.012;
 const DRIFT_SPEED = 0.03; // gentle — noise drives flow, not acceleration
 const WRAP_BOUND = 6;
-const LINE_DISTANCE = 0.7; // distance threshold for constellation lines
-const MAX_LINES = 3000; // cap on visible line segments for perf
 const GLOBAL_ROTATION_SPEED = 0.008; // rad/s — very slow cloud rotation
 
 // Brand palette (linear-space values will be computed from these)
@@ -153,26 +151,6 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-// Line shaders — simple with fade by distance
-const lineVertexShader = /* glsl */ `
-  attribute float aLineAlpha;
-  varying float vAlpha;
-
-  void main() {
-    vAlpha = aLineAlpha;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const lineFragmentShader = /* glsl */ `
-  uniform vec3 uLineColor;
-  varying float vAlpha;
-
-  void main() {
-    gl_FragColor = vec4(uLineColor * vAlpha, vAlpha);
-  }
-`;
-
 // ---------------------------------------------------------------------------
 // Weighted random palette pick
 // ---------------------------------------------------------------------------
@@ -194,7 +172,6 @@ export function ParticleField() {
   const { size } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const pointsRef = useRef<THREE.Points>(null);
-  const linesRef = useRef<THREE.LineSegments>(null);
   const mouseWorld = useRef(new THREE.Vector3(0, 0, 0));
   const mouseActive = useRef(false);
 
@@ -307,13 +284,6 @@ export function ParticleField() {
   // Initialize line geometry (pre-allocated buffer, updated each frame)
   // -------------------------------------------------------------------------
 
-  const lineData = useMemo(() => {
-    // Each segment = 2 vertices, 3 floats each
-    const linePositions = new Float32Array(MAX_LINES * 2 * 3);
-    const lineAlphas = new Float32Array(MAX_LINES * 2);
-    return { linePositions, lineAlphas };
-  }, []);
-
   // -------------------------------------------------------------------------
   // Uniforms
   // -------------------------------------------------------------------------
@@ -321,13 +291,6 @@ export function ParticleField() {
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-    }),
-    [],
-  );
-
-  const lineUniforms = useMemo(
-    () => ({
-      uLineColor: { value: new THREE.Color("#00d4ff").multiplyScalar(0.4) },
     }),
     [],
   );
@@ -433,74 +396,6 @@ export function ParticleField() {
 
     posAttr.needsUpdate = true;
 
-    // --- Constellation lines ---
-    if (linesRef.current) {
-      const lineGeo = linesRef.current.geometry;
-      const linePosArr = lineData.linePositions;
-      const lineAlphaArr = lineData.lineAlphas;
-      let lineCount = 0;
-
-      // Spatial check — only compare nearby particles via a simple grid
-      // For perf, we check a random subset each frame rather than all N^2 pairs
-      const SAMPLE_SIZE = 600; // particles to check each frame
-      const step = Math.max(1, Math.floor(particleCount / SAMPLE_SIZE));
-
-      for (
-        let i = 0;
-        i < particleCount && lineCount < MAX_LINES;
-        i += step
-      ) {
-        const ax = posArr[i * 3];
-        const ay = posArr[i * 3 + 1];
-        const az = posArr[i * 3 + 2];
-
-        for (
-          let j = i + 1;
-          j < Math.min(i + 30, particleCount) && lineCount < MAX_LINES;
-          j++
-        ) {
-          const bx = posArr[j * 3];
-          const by = posArr[j * 3 + 1];
-          const bz = posArr[j * 3 + 2];
-
-          const dx = ax - bx;
-          const dy = ay - by;
-          const dz = az - bz;
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-          if (dist < LINE_DISTANCE) {
-            const alpha = (1 - dist / LINE_DISTANCE) * 0.25;
-            const li = lineCount * 6;
-            linePosArr[li] = ax;
-            linePosArr[li + 1] = ay;
-            linePosArr[li + 2] = az;
-            linePosArr[li + 3] = bx;
-            linePosArr[li + 4] = by;
-            linePosArr[li + 5] = bz;
-
-            const ai = lineCount * 2;
-            lineAlphaArr[ai] = alpha;
-            lineAlphaArr[ai + 1] = alpha;
-            lineCount++;
-          }
-        }
-      }
-
-      // Zero out unused segments
-      for (let k = lineCount * 6; k < linePosArr.length; k++) {
-        linePosArr[k] = 0;
-      }
-      for (let k = lineCount * 2; k < lineAlphaArr.length; k++) {
-        lineAlphaArr[k] = 0;
-      }
-
-      const linePosAttr = lineGeo.attributes.position as THREE.BufferAttribute;
-      const lineAlphaAttr = lineGeo.attributes
-        .aLineAlpha as THREE.BufferAttribute;
-      linePosAttr.needsUpdate = true;
-      lineAlphaAttr.needsUpdate = true;
-    }
-
     // --- Subtle global rotation ---
     if (groupRef.current) {
       groupRef.current.rotation.y += GLOBAL_ROTATION_SPEED * dt;
@@ -520,19 +415,6 @@ export function ParticleField() {
     return geo;
   }, [positions, colors, sizes, opacities, phases]);
 
-  const lineGeometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute(
-      "position",
-      new THREE.BufferAttribute(lineData.linePositions, 3),
-    );
-    geo.setAttribute(
-      "aLineAlpha",
-      new THREE.BufferAttribute(lineData.lineAlphas, 1),
-    );
-    return geo;
-  }, [lineData]);
-
   return (
     <group ref={groupRef}>
       <points ref={pointsRef} geometry={particleGeometry}>
@@ -546,17 +428,6 @@ export function ParticleField() {
           blending={THREE.AdditiveBlending}
         />
       </points>
-
-      <lineSegments ref={linesRef} geometry={lineGeometry}>
-        <shaderMaterial
-          vertexShader={lineVertexShader}
-          fragmentShader={lineFragmentShader}
-          uniforms={lineUniforms}
-          transparent
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </lineSegments>
     </group>
   );
 }
