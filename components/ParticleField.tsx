@@ -302,6 +302,16 @@ export function ParticleField() {
       velocities[iy] += Math.cos(t * 0.25 + phase * 1.3) * 0.0005 * dt;
       velocities[iz] += Math.sin(t * 0.2 + phase * 0.7) * 0.0003 * dt;
 
+      // Spring force — always pulls toward center, stronger the farther out
+      // Prevents noise from sweeping all particles to one side
+      const distFromOrigin = Math.sqrt(px * px + py * py + pz * pz);
+      if (distFromOrigin > 0.1) {
+        const springStrength = 0.0015 * distFromOrigin;
+        velocities[ix] -= (px / distFromOrigin) * springStrength * dt;
+        velocities[iy] -= (py / distFromOrigin) * springStrength * dt;
+        velocities[iz] -= (pz / distFromOrigin) * springStrength * dt;
+      }
+
       // Velocity cap
       const speed = Math.sqrt(
         velocities[ix] ** 2 + velocities[iy] ** 2 + velocities[iz] ** 2,
