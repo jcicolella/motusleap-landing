@@ -9,12 +9,11 @@ import * as THREE from "three";
 // ---------------------------------------------------------------------------
 
 const SPREAD = 5; // radius of initial sphere
-const MOUSE_ATTRACT_RADIUS = 2.5;
-const MOUSE_REPEL_RADIUS = 0.6;
-const ATTRACT_STRENGTH = 0.004;
-const REPEL_STRENGTH = 0.012;
+const MOUSE_RADIUS = 2.0; // zone of influence
+const MOUSE_STRENGTH = 0.002; // very gentle push away — no attraction
 const DRIFT_SPEED = 0.03; // gentle — noise drives flow, not acceleration
 const WRAP_BOUND = 6;
+const MAX_VELOCITY = 0.015; // velocity cap prevents streaking
 const GLOBAL_ROTATION_SPEED = 0.008; // rad/s — very slow cloud rotation
 
 // Brand palette (linear-space values will be computed from these)
@@ -348,29 +347,33 @@ export function ParticleField() {
       velocities[iy] += Math.cos(t * 0.25 + phase * 1.3) * 0.0005 * dt;
       velocities[iz] += Math.sin(t * 0.2 + phase * 0.7) * 0.0003 * dt;
 
-      // Mouse interaction
+      // Mouse interaction — gentle repulsion only (no attraction = no streaking)
       if (mouseActive.current) {
         const dx = mouseWorld.current.x - px;
         const dy = mouseWorld.current.y - py;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < MOUSE_ATTRACT_RADIUS && dist > MOUSE_REPEL_RADIUS) {
-          // Attraction zone — gentle pull
-          const strength =
-            ATTRACT_STRENGTH *
-            (1 - (dist - MOUSE_REPEL_RADIUS) / (MOUSE_ATTRACT_RADIUS - MOUSE_REPEL_RADIUS));
-          velocities[ix] += (dx / dist) * strength;
-          velocities[iy] += (dy / dist) * strength;
-        } else if (dist < MOUSE_REPEL_RADIUS && dist > 0.01) {
-          // Repulsion zone — push away
-          const strength = REPEL_STRENGTH * (1 - dist / MOUSE_REPEL_RADIUS);
+        if (dist < MOUSE_RADIUS && dist > 0.01) {
+          // Smooth falloff — stronger close, fades to zero at edge
+          const strength = MOUSE_STRENGTH * (1 - dist / MOUSE_RADIUS);
           velocities[ix] -= (dx / dist) * strength;
           velocities[iy] -= (dy / dist) * strength;
         }
       }
 
-      // Damping — strong enough to keep things calm
-      const damping = 0.92;
+      // Velocity cap — prevents any streaking
+      const speed = Math.sqrt(
+        velocities[ix] ** 2 + velocities[iy] ** 2 + velocities[iz] ** 2,
+      );
+      if (speed > MAX_VELOCITY) {
+        const scale = MAX_VELOCITY / speed;
+        velocities[ix] *= scale;
+        velocities[iy] *= scale;
+        velocities[iz] *= scale;
+      }
+
+      // Damping
+      const damping = 0.94;
       velocities[ix] *= damping;
       velocities[iy] *= damping;
       velocities[iz] *= damping;
