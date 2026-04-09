@@ -57,9 +57,10 @@ export function ForegroundParticles() {
     [size.width, size.height],
   );
 
-  const { positions, riseSpeeds, colors, sizes, opacities, phases } =
+  const { positions, baseX, riseSpeeds, colors, sizes, opacities, phases } =
     useMemo(() => {
       const pos = new Float32Array(COUNT * 3);
+      const bx = new Float32Array(COUNT);
       const rise = new Float32Array(COUNT);
       const col = new Float32Array(COUNT * 3);
       const sz = new Float32Array(COUNT);
@@ -70,6 +71,7 @@ export function ForegroundParticles() {
         pos[i * 3] = (Math.random() - 0.5) * halfW * 2;
         pos[i * 3 + 1] = (Math.random() - 0.5) * HALF_H * 2;
         pos[i * 3 + 2] = (Math.random() - 0.5) * 2;
+        bx[i] = pos[i * 3];
 
         rise[i] = BASE_RISE_SPEED * (0.5 + Math.random() * 1.0);
 
@@ -85,6 +87,7 @@ export function ForegroundParticles() {
 
       return {
         positions: pos,
+        baseX: bx,
         riseSpeeds: rise,
         colors: col,
         sizes: sz,
@@ -126,14 +129,16 @@ export function ForegroundParticles() {
       // Upward drift
       posArr[ix + 1] += riseSpeeds[i] * dt;
 
-      // Gentle wobble
-      posArr[ix] += Math.sin(t * 0.3 + phase) * 0.15 * dt;
+      // Absolute wobble (no drift)
+      posArr[ix] = baseX[i] + Math.sin(t * 0.3 + phase) * 0.2;
 
       // Recycle at top
       if (posArr[ix + 1] > topEdge) {
-        posArr[ix] = (Math.random() - 0.5) * halfW * 2;
+        const newX = (Math.random() - 0.5) * halfW * 2;
+        posArr[ix] = newX;
         posArr[ix + 1] = bottomEdge;
         posArr[ix + 2] = (Math.random() - 0.5) * 2;
+        baseX[i] = newX;
       }
     }
 

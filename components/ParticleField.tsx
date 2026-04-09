@@ -136,20 +136,20 @@ export function ParticleField() {
   }, [size.width, size.height]);
 
   // Initialize particle data
-  const { positions, riseSpeeds, colors, sizes, opacities, phases } =
+  const { positions, baseX, riseSpeeds, colors, sizes, opacities, phases } =
     useMemo(() => {
       const pos = new Float32Array(particleCount * 3);
-      const rise = new Float32Array(particleCount); // per-particle rise speed
+      const bx = new Float32Array(particleCount); // home x position for wobble
+      const rise = new Float32Array(particleCount);
       const col = new Float32Array(particleCount * 3);
       const sz = new Float32Array(particleCount);
       const op = new Float32Array(particleCount);
       const ph = new Float32Array(particleCount);
 
       for (let i = 0; i < particleCount; i++) {
-        // Spread across the visible viewport
         spawnParticle(pos, i * 3, halfW);
+        bx[i] = pos[i * 3]; // store initial x as home position
 
-        // Each particle rises at a slightly different speed
         rise[i] = BASE_RISE_SPEED * (0.6 + Math.random() * 0.8);
 
         const c = pickColor(Math.random());
@@ -164,6 +164,7 @@ export function ParticleField() {
 
       return {
         positions: pos,
+        baseX: bx,
         riseSpeeds: rise,
         colors: col,
         sizes: sz,
@@ -279,15 +280,16 @@ export function ParticleField() {
       // Apply upward movement
       posArr[iy] += riseSpeed * dt;
 
-      // Gentle horizontal wobble
-      posArr[ix] += Math.sin(t * 0.4 + phase) * WOBBLE_STRENGTH * dt;
+      // Horizontal wobble — absolute offset from home x (no drift)
+      posArr[ix] = baseX[i] + Math.sin(t * 0.4 + phase) * WOBBLE_STRENGTH;
 
-      // Subtle z wobble
-      posArr[iz] += Math.sin(t * 0.2 + phase * 1.7) * 0.05 * dt;
+      // Subtle z wobble — also absolute
+      posArr[iz] = Math.sin(t * 0.2 + phase * 1.7) * 0.3;
 
       // Recycle at top
       if (posArr[iy] > topEdge) {
         spawnParticle(posArr, ix, halfW, bottomEdge);
+        baseX[i] = posArr[ix]; // new home x
       }
     }
 
