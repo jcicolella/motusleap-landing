@@ -21,9 +21,10 @@ describe("Home page", () => {
     expect(screen.getByText("MOTUS LEAP")).toBeDefined();
   });
 
-  it("renders the Three.js canvas", () => {
+  it("renders both particle canvases", () => {
     render(<Home />);
-    expect(screen.getByTestId("r3f-canvas")).toBeDefined();
+    const canvases = screen.getAllByTestId("r3f-canvas");
+    expect(canvases.length).toBe(2);
   });
 
   it("renders the brand name as an h1", () => {
