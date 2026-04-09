@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useCallback, useEffect } from "react";
+import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -9,8 +9,6 @@ import * as THREE from "three";
 // ---------------------------------------------------------------------------
 
 const SPREAD = 5; // radius of initial sphere
-const MOUSE_RADIUS = 1.5; // zone of influence
-const MOUSE_STRENGTH = 0.0008; // barely perceptible push
 const DRIFT_SPEED = 0.03; // gentle — noise drives flow, not acceleration
 const WRAP_BOUND = 6;
 const MAX_VELOCITY = 0.008; // velocity cap prevents streaking
@@ -171,49 +169,6 @@ export function ParticleField() {
   const { size } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const pointsRef = useRef<THREE.Points>(null);
-  const mouseWorld = useRef(new THREE.Vector3(0, 0, 0));
-  const mouseActive = useRef(false);
-
-  // Track pointer in world-space (z = 0 plane at camera distance ≈ 5)
-  const onPointerMove = useCallback(
-    (e: PointerEvent) => {
-      // Normalize to [-1,1]
-      const nx = (e.clientX / size.width) * 2 - 1;
-      const ny = -(e.clientY / size.height) * 2 + 1;
-      // Approximate world position at z=0 for our camera at z=5, fov=75
-      const halfH = 5 * Math.tan((75 / 2) * (Math.PI / 180));
-      const halfW = halfH * (size.width / size.height);
-      mouseWorld.current.set(nx * halfW, ny * halfH, 0);
-      mouseActive.current = true;
-    },
-    [size],
-  );
-
-  const onPointerLeave = useCallback(() => {
-    mouseActive.current = false;
-  }, []);
-
-  // Attach/detach pointer listeners
-  useEffect(() => {
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
-        const nx = (e.touches[0].clientX / size.width) * 2 - 1;
-        const ny = -(e.touches[0].clientY / size.height) * 2 + 1;
-        const halfH = 5 * Math.tan((75 / 2) * (Math.PI / 180));
-        const halfW = halfH * (size.width / size.height);
-        mouseWorld.current.set(nx * halfW, ny * halfH, 0);
-        mouseActive.current = true;
-      }
-    };
-    window.addEventListener("pointermove", onPointerMove as EventListener);
-    window.addEventListener("pointerleave", onPointerLeave);
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove as EventListener);
-      window.removeEventListener("pointerleave", onPointerLeave);
-      window.removeEventListener("touchmove", handleTouchMove);
-    };
-  }, [onPointerMove, onPointerLeave, size]);
 
   // -------------------------------------------------------------------------
   // Responsive particle count
@@ -347,21 +302,7 @@ export function ParticleField() {
       velocities[iy] += Math.cos(t * 0.25 + phase * 1.3) * 0.0005 * dt;
       velocities[iz] += Math.sin(t * 0.2 + phase * 0.7) * 0.0003 * dt;
 
-      // Mouse interaction — gentle repulsion only (no attraction = no streaking)
-      if (mouseActive.current) {
-        const dx = mouseWorld.current.x - px;
-        const dy = mouseWorld.current.y - py;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist < MOUSE_RADIUS && dist > 0.01) {
-          // Smooth falloff — stronger close, fades to zero at edge
-          const strength = MOUSE_STRENGTH * (1 - dist / MOUSE_RADIUS);
-          velocities[ix] -= (dx / dist) * strength;
-          velocities[iy] -= (dy / dist) * strength;
-        }
-      }
-
-      // Velocity cap — prevents any streaking
+      // Velocity cap
       const speed = Math.sqrt(
         velocities[ix] ** 2 + velocities[iy] ** 2 + velocities[iz] ** 2,
       );
