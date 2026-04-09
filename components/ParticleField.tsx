@@ -156,7 +156,13 @@ export function ParticleField() {
         col[i * 3 + 1] = c.g;
         col[i * 3 + 2] = c.b;
 
-        sz[i] = 1.0 + Math.random() * 2.5;
+        // Power curve — mostly small with a few noticeably larger ones
+        const sizeRoll = Math.random();
+        sz[i] = sizeRoll < 0.7
+          ? 0.5 + Math.random() * 1.5   // 70%: tiny specks (0.5-2.0)
+          : sizeRoll < 0.92
+            ? 2.0 + Math.random() * 2.5 // 22%: medium (2.0-4.5)
+            : 4.5 + Math.random() * 3.5; // 8%: large glowing dots (4.5-8.0)
         op[i] = 0.15 + Math.random() * 0.45;
         ph[i] = Math.random();
       }

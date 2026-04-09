@@ -80,7 +80,10 @@ export function ForegroundParticles() {
         col[i * 3 + 1] = c.g;
         col[i * 3 + 2] = c.b;
 
-        sz[i] = 1.5 + Math.random() * 3.0;
+        // Foreground: biased larger (closer to camera feel)
+        sz[i] = Math.random() < 0.6
+          ? 1.0 + Math.random() * 2.0
+          : 3.5 + Math.random() * 4.0;
         op[i] = 0.08 + Math.random() * 0.18;
         ph[i] = Math.random();
       }
