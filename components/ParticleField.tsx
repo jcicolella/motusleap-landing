@@ -14,9 +14,14 @@ const CAM_FOV = 75;
 const HALF_H = CAM_Z * Math.tan((CAM_FOV / 2) * (Math.PI / 180)); // ~3.73
 const BASE_RISE_SPEED = 0.4; // base upward speed (world units/sec)
 const WOBBLE_STRENGTH = 0.3; // horizontal sine drift amplitude
-const SURGE_INTERVAL = 8; // seconds between cascade surges
-const SURGE_DURATION = 2.5; // how long a surge lasts
-const SURGE_MULTIPLIER = 3.0; // how much faster particles move during surge
+// Phi-based dual surge rhythm — two cycles that never fully sync
+const PHI = 1.618033988749895;
+const MAJOR_INTERVAL = 8; // major surge cycle (seconds)
+const MINOR_INTERVAL = MAJOR_INTERVAL / PHI; // ~4.94s — golden ratio relationship
+const MAJOR_DURATION = 2.5;
+const MINOR_DURATION = 1.5;
+const MAJOR_MULTIPLIER = 3.0;
+const MINOR_MULTIPLIER = 1.8;
 const GLOBAL_ROTATION_SPEED = 0.006;
 
 // Brand palette
@@ -36,28 +41,33 @@ const vertexShader = /* glsl */ `
   attribute float aOpacity;
   attribute float aPhase;
   uniform float uTime;
-  uniform float uSurgeProgress; // 0 = no surge, 0→1 = wave sweeping up
-  uniform float uSurgeActive;   // 0 or 1
+  uniform float uMajorWaveFront; // y-position of major wave front (-999 = inactive)
+  uniform float uMinorWaveFront; // y-position of minor wave front (-999 = inactive)
+  uniform float uMajorIntensity; // 0-1 intensity of major surge
+  uniform float uMinorIntensity; // 0-1 intensity of minor surge
   varying float vOpacity;
   varying vec3 vColor;
 
   void main() {
-    // Brightness pulse + surge brightening
     float pulse = 0.85 + 0.15 * sin(uTime * 1.2 + aPhase * 6.2831);
 
-    // During surge, particles near the wave front glow brighter
-    float surgeGlow = 0.0;
-    if (uSurgeActive > 0.5) {
-      // Wave front position in normalized y (-1 to 1)
-      float waveFront = mix(-1.2, 1.2, uSurgeProgress);
-      // How close this particle is to the wave front (in clip space y)
-      vec4 worldPos = modelMatrix * vec4(position, 1.0);
-      float normalizedY = worldPos.y / 3.73; // approximate half-height
-      float distToWave = abs(normalizedY - waveFront);
-      surgeGlow = smoothstep(0.6, 0.0, distToWave) * 0.4;
+    // Surge glow — particles near either wave front brighten
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    float py = worldPos.y;
+
+    float majorGlow = 0.0;
+    if (uMajorWaveFront > -900.0) {
+      float dist = abs(py - uMajorWaveFront);
+      majorGlow = smoothstep(1.5, 0.0, dist) * 0.5 * uMajorIntensity;
     }
 
-    vOpacity = aOpacity * (pulse + surgeGlow);
+    float minorGlow = 0.0;
+    if (uMinorWaveFront > -900.0) {
+      float dist = abs(py - uMinorWaveFront);
+      minorGlow = smoothstep(1.0, 0.0, dist) * 0.25 * uMinorIntensity;
+    }
+
+    vOpacity = aOpacity * (pulse + majorGlow + minorGlow);
     vColor = color;
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -166,8 +176,10 @@ export function ParticleField() {
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uSurgeProgress: { value: 0 },
-      uSurgeActive: { value: 0 },
+      uMajorWaveFront: { value: -999 },
+      uMinorWaveFront: { value: -999 },
+      uMajorIntensity: { value: 0 },
+      uMinorIntensity: { value: 0 },
     }),
     [],
   );
@@ -195,23 +207,44 @@ export function ParticleField() {
     uniforms.uTime.value += dt;
     const t = uniforms.uTime.value;
 
-    // --- Cascade surge timing ---
-    const cycleTime = t % SURGE_INTERVAL;
-    const surgeStart = SURGE_INTERVAL - SURGE_DURATION;
-    const isSurging = cycleTime > surgeStart;
-    const surgeProgress = isSurging
-      ? (cycleTime - surgeStart) / SURGE_DURATION
+    // --- Dual surge timing (golden ratio rhythm) ---
+    // Major surge
+    const majorCycle = t % MAJOR_INTERVAL;
+    const majorStart = MAJOR_INTERVAL - MAJOR_DURATION;
+    const majorActive = majorCycle > majorStart;
+    const majorProgress = majorActive
+      ? (majorCycle - majorStart) / MAJOR_DURATION
       : 0;
-    uniforms.uSurgeActive.value = isSurging ? 1 : 0;
-    uniforms.uSurgeProgress.value = surgeProgress;
-
-    // Wave front y-position (sweeps from bottom to top during surge)
-    const waveFrontY = isSurging
-      ? -HALF_H + surgeProgress * HALF_H * 2.4
+    // Smooth intensity: ease in and out
+    const majorIntensity = majorActive
+      ? Math.sin(majorProgress * Math.PI)
+      : 0;
+    const majorWaveY = majorActive
+      ? -HALF_H + majorProgress * HALF_H * 2.4
       : -999;
 
-    const topEdge = HALF_H + 0.5; // slightly above visible area
-    const bottomEdge = -HALF_H - 0.5; // slightly below
+    // Minor surge (phi-offset cycle)
+    const minorCycle = t % MINOR_INTERVAL;
+    const minorStart = MINOR_INTERVAL - MINOR_DURATION;
+    const minorActive = minorCycle > minorStart;
+    const minorProgress = minorActive
+      ? (minorCycle - minorStart) / MINOR_DURATION
+      : 0;
+    const minorIntensity = minorActive
+      ? Math.sin(minorProgress * Math.PI)
+      : 0;
+    const minorWaveY = minorActive
+      ? -HALF_H + minorProgress * HALF_H * 2.4
+      : -999;
+
+    // Pass to shader
+    uniforms.uMajorWaveFront.value = majorWaveY;
+    uniforms.uMinorWaveFront.value = minorWaveY;
+    uniforms.uMajorIntensity.value = majorIntensity;
+    uniforms.uMinorIntensity.value = minorIntensity;
+
+    const topEdge = HALF_H + 0.5;
+    const bottomEdge = -HALF_H - 0.5;
 
     // --- Update particles ---
     for (let i = 0; i < particleCount; i++) {
@@ -225,11 +258,20 @@ export function ParticleField() {
       // Base upward rise
       let riseSpeed = riseSpeeds[i];
 
-      // Surge boost — particles near the wave front get accelerated
-      if (isSurging) {
-        const distToWave = Math.abs(py - waveFrontY);
-        if (distToWave < 1.5) {
-          const boost = (1 - distToWave / 1.5) * SURGE_MULTIPLIER;
+      // Major surge boost
+      if (majorActive) {
+        const dist = Math.abs(py - majorWaveY);
+        if (dist < 1.5) {
+          const boost = (1 - dist / 1.5) * MAJOR_MULTIPLIER * majorIntensity;
+          riseSpeed *= 1 + boost;
+        }
+      }
+
+      // Minor surge boost
+      if (minorActive) {
+        const dist = Math.abs(py - minorWaveY);
+        if (dist < 1.0) {
+          const boost = (1 - dist / 1.0) * MINOR_MULTIPLIER * minorIntensity;
           riseSpeed *= 1 + boost;
         }
       }
@@ -237,13 +279,13 @@ export function ParticleField() {
       // Apply upward movement
       posArr[iy] += riseSpeed * dt;
 
-      // Gentle horizontal wobble (sine-driven, unique per particle)
+      // Gentle horizontal wobble
       posArr[ix] += Math.sin(t * 0.4 + phase) * WOBBLE_STRENGTH * dt;
 
-      // Very subtle z wobble
+      // Subtle z wobble
       posArr[iz] += Math.sin(t * 0.2 + phase * 1.7) * 0.05 * dt;
 
-      // Recycle particles that rise above the viewport
+      // Recycle at top
       if (posArr[iy] > topEdge) {
         spawnParticle(posArr, ix, halfW, bottomEdge);
       }

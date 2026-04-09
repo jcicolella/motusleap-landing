@@ -79,7 +79,7 @@ export function ForegroundParticles() {
         col[i * 3 + 2] = c.b;
 
         sz[i] = 1.5 + Math.random() * 3.0;
-        op[i] = 0.04 + Math.random() * 0.1;
+        op[i] = 0.08 + Math.random() * 0.18;
         ph[i] = Math.random();
       }
 
