@@ -50,11 +50,14 @@ export function BrandOverlay() {
           ? `translate(${s.x}px, ${s.y}px)`
           : `translate(${s.x}px, ${s.y + 12}px)`;
 
-        // Directional teal glow that follows the cursor
+        // Directional teal glow — tight + bright so it's actually visible
         h1Ref.current.style.textShadow = [
-          `${s.shadowX}px ${s.shadowY}px 60px rgba(0, 212, 255, 0.35)`,
-          `${s.shadowX * 0.5}px ${s.shadowY * 0.5}px 20px rgba(0, 212, 255, 0.15)`,
-          `0 0 40px rgba(0, 212, 255, 0.1)`,
+          // Tight directional glow (follows mouse)
+          `${s.shadowX}px ${s.shadowY}px 15px rgba(0, 212, 255, 0.6)`,
+          // Wider directional halo
+          `${s.shadowX * 0.6}px ${s.shadowY * 0.6}px 40px rgba(0, 212, 255, 0.3)`,
+          // Ambient base glow (always visible, centered)
+          `0 0 10px rgba(0, 212, 255, 0.25)`,
         ].join(", ");
       }
 
