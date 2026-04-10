@@ -3,6 +3,7 @@
 import { useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { surgeState } from "./surgeState";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -248,6 +249,12 @@ export function ParticleField() {
     uniforms.uMinorWaveFront.value = minorWaveY;
     uniforms.uMajorIntensity.value = majorIntensity;
     uniforms.uMinorIntensity.value = minorIntensity;
+
+    // Share with BrandOverlay for synchronized glow
+    surgeState.majorIntensity = majorIntensity;
+    surgeState.minorIntensity = minorIntensity;
+    surgeState.majorWaveY = majorWaveY;
+    surgeState.minorWaveY = minorWaveY;
 
     const topEdge = HALF_H + 0.5;
     const bottomEdge = -HALF_H - 0.5;

@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { surgeState } from "./surgeState";
+
+// Text sits at roughly y=0 in world space. HALF_H ≈ 3.73.
+// We check how close each wave front is to the text's vertical position.
+const TEXT_WORLD_Y = 0;
+const GLOW_REACH = 2.0; // how close the wave front needs to be to affect the text
 
 export function BrandOverlay() {
   const [visible, setVisible] = useState(false);
   const h1Ref = useRef<HTMLHeadingElement>(null);
   const mouseRef = useRef({ x: 0.5, y: 0.5 });
   const rafRef = useRef<number>(0);
-  const smoothRef = useRef({ x: 0, y: 0, shadowX: 0, shadowY: 0 });
+  const smoothRef = useRef({ x: 0, y: 0, glow: 0 });
 
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), 800);
@@ -24,40 +30,57 @@ export function BrandOverlay() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [handleMouseMove]);
 
-  // Smooth animation loop — parallax + directional glow
   useEffect(() => {
     const animate = () => {
       const s = smoothRef.current;
       const m = mouseRef.current;
 
-      // Parallax: mouse at center = no offset, edges = ±12px (inverted for depth)
+      // Parallax (still mouse-driven — this is depth, not glow)
       const targetX = (m.x - 0.5) * -24;
       const targetY = (m.y - 0.5) * -16;
+      s.x += (targetX - s.x) * 0.04;
+      s.y += (targetY - s.y) * 0.04;
 
-      // Shadow offset: glow shifts TOWARD the mouse
-      const targetShadowX = (m.x - 0.5) * 40;
-      const targetShadowY = (m.y - 0.5) * 24;
+      // Surge-driven glow — how close is each wave front to the text?
+      let targetGlow = 0;
 
-      // Smooth lerp
-      const lerp = 0.04;
-      s.x += (targetX - s.x) * lerp;
-      s.y += (targetY - s.y) * lerp;
-      s.shadowX += (targetShadowX - s.shadowX) * lerp;
-      s.shadowY += (targetShadowY - s.shadowY) * lerp;
+      if (surgeState.majorWaveY > -900) {
+        const dist = Math.abs(TEXT_WORLD_Y - surgeState.majorWaveY);
+        if (dist < GLOW_REACH) {
+          targetGlow += (1 - dist / GLOW_REACH) * surgeState.majorIntensity;
+        }
+      }
+
+      if (surgeState.minorWaveY > -900) {
+        const dist = Math.abs(TEXT_WORLD_Y - surgeState.minorWaveY);
+        if (dist < GLOW_REACH) {
+          targetGlow += (1 - dist / GLOW_REACH) * surgeState.minorIntensity * 0.5;
+        }
+      }
+
+      targetGlow = Math.min(targetGlow, 1);
+      s.glow += (targetGlow - s.glow) * 0.08; // slightly faster lerp for responsiveness
 
       if (h1Ref.current) {
         h1Ref.current.style.transform = visible
           ? `translate(${s.x}px, ${s.y}px)`
           : `translate(${s.x}px, ${s.y + 12}px)`;
 
-        // Directional teal glow — tight + bright so it's actually visible
+        // Glow from below (particles are rising up through the text)
+        // Shifts upward during surge, as if the wave is pushing light through
+        const glowAlpha = 0.15 + s.glow * 0.6;
+        const glowSpread = 12 + s.glow * 25;
+        const glowY = 2 + s.glow * 6; // glow shifts upward during surge
+        const wideAlpha = 0.08 + s.glow * 0.25;
+        const wideSpread = 30 + s.glow * 20;
+
         h1Ref.current.style.textShadow = [
-          // Tight directional glow (follows mouse)
-          `${s.shadowX}px ${s.shadowY}px 15px rgba(0, 212, 255, 0.6)`,
-          // Wider directional halo
-          `${s.shadowX * 0.6}px ${s.shadowY * 0.6}px 40px rgba(0, 212, 255, 0.3)`,
-          // Ambient base glow (always visible, centered)
-          `0 0 10px rgba(0, 212, 255, 0.25)`,
+          // Core glow (shifts upward with surge)
+          `0 ${glowY}px ${glowSpread}px rgba(0, 212, 255, ${glowAlpha})`,
+          // Wide ambient halo
+          `0 ${glowY * 0.5}px ${wideSpread}px rgba(0, 212, 255, ${wideAlpha})`,
+          // Constant subtle base
+          `0 2px 8px rgba(0, 212, 255, 0.12)`,
         ].join(", ");
       }
 
@@ -77,7 +100,7 @@ export function BrandOverlay() {
           fontSize: "clamp(1.5rem, 6vw, 6rem)",
           opacity: visible ? 0.9 : 0,
           transform: "translateY(12px)",
-          textShadow: "0 0 40px rgba(0, 212, 255, 0.15)",
+          textShadow: "0 2px 8px rgba(0, 212, 255, 0.12)",
         }}
       >
         MOTUS LEAP
